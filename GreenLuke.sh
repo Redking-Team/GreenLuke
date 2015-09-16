@@ -56,8 +56,8 @@ connect() {
 	fi
 	echo "let's get this party started" | log
 	message=$(echo | unison $directory ssh://$username@$remoteIp/$directory -auto -owner -terse -batch 2>&1) 
-	echo $message | log
 	unisonError=$?
+	echo $message | log
 	if test $unisonError != 0; then
 		echo "unison return some error" | log
 		echo "informing user" | log
