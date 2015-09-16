@@ -76,7 +76,7 @@ connect() {
 listen() {
 	while true; do		
 		echo "listening..." | log
-		remoteIp=$(echo $(hostname) | socat -T 3 UDP-LISTEN:$port -) 
+		remoteIp=$(hostname | socat -T 3 UDP-LISTEN:$port -) 
 		sleep 1s 	# otherwise our logfiles get messed up
 		echo "incomming request" | log
 		if test "$remoteIp" == "$(getIp)"; then
