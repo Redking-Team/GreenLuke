@@ -12,6 +12,11 @@ logfile=/home/overflow/.GreenLuke.log
 IpFile=/dev/shm/GreenLuke$$.ip
 SearchFile=/dev/shm/GreenLuke$$.search
 
+log() {
+	date "+%Y-%m-%d %H:%M:%S : " | tr -d '\n' | tee -a $logfile
+	tee -a $logfile
+}
+
 setIp() {
 	echo -n $1 > $IpFile
 }
@@ -30,45 +35,45 @@ setSearch 1
 
 connect() {
 	remoteIp=$1
-	echo "trying to establish connection with $remoteIp" | tee -a $logfile
-	echo "testing for public key auth..." | tee -a $logfile
+	echo "trying to establish connection with $remoteIp" | log
+	echo "testing for public key auth..." | log
 	ssh -q -o BatchMode=yes $username@$remoteIp true 2> /dev/null
 	if test $? != 0; then
-		echo "... no public key auth, stopping here" | tee -a $logfile
+		echo "... no public key auth, stopping here" | log
 		return
 	fi
-	echo "testing server..." | tee -a $logfile
-	unison $directory ssh://$username@$remoteIp/$directory -ui text -testserver 2>&1 | tee -a $logfile
+	echo "testing server..." | log
+	unison $directory ssh://$username@$remoteIp/$directory -ui text -testserver 2>&1 | log
 	if test $? != 0; then
-		echo "... unison error. : (" | tee -a $logfile
+		echo "... unison error. : (" | log
 		return
 	fi
-	echo "let's get this party started" | tee -a $logfile
+	echo "let's get this party started" | log
 	message=$(echo | unison $directory ssh://$username@$remoteIp/$directory -auto -owner -terse -batch 2>&1) 
-	echo $message | tee -a $logfile
+	echo $message | log
 	unisonError=$?
 	if test $unisonError != 0; then
-		echo "unison return some error" | tee -a $logfile
-		echo "informing user" | tee -a $logfile
+		echo "unison return some error" | log
+		echo "informing user" | log
 		if test $unisonError == 1; then
 			zenity --warning --text="$(echo $message | tr -d '<' | tr -d '>' |)" --title=="GreenLuke"
 		else
 			zenity --error --text="There was a critical error while synchronizing.\nGreenLuke will exit now.\nPlease check out $log" --title="GreenLuke"
-			echo "exiting" | tee -a $logfile
+			echo "exiting" | log
 			exit
 		fi
 	fi
-	echo "successfully synchronized." | tee -a $logfile
-	echo "restarting daemon." | tee -a $logfile
+	echo "successfully synchronized." | log
+	echo "restarting daemon." | log
 }
 
 listen() {
 	while true; do		
-		echo "listening..." | tee -a $logfile
+		echo "listening..." | log
 		remoteIp=$(echo $(hostname) | socat -T 3 UDP-LISTEN:$port -) 
-		echo "incomming request" | tee -a $logfile
+		echo "incomming request" | log
 		if test "$remoteIp" == "$(getIp)"; then
-			echo "oh, that's me. ignoring ourself" | tee -a $logfile
+			echo "oh, that's me. ignoring ourself" | log
 		else
 			setSearch 0
 			connect $remoteIp
@@ -83,11 +88,11 @@ sleep 3s
 
 while true; do
 	if test $(getSearch) != 0; then
-		echo -n "searching... " | tee -a $logfile
+		echo -n "searching... " | log
 		ip=$(ip addr show eth0 | grep "inet " | awk '{print $2}' | awk -F'/' '{print $1}')
 		remoteHostname=$(echo $ip | socat - UDP-DATAGRAM:255.255.255.255:$port,broadcast)
 		setIp $ip
-		echo "found: $remoteHostname" | tee -a $logfile
+		echo "found: $remoteHostname" | log
 	fi
 	sleep  $(($RANDOM % ($maxSleep - $minSleep) + $minSleep))
 done
