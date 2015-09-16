@@ -88,7 +88,7 @@ sleep 3s
 
 while true; do
 	if test $(getSearch) != 0; then
-		echo -n "searching... " | log
+		echo "searching... " | log
 		ip=$(ip addr show eth0 | grep "inet " | awk '{print $2}' | awk -F'/' '{print $1}')
 		remoteHostname=$(echo $ip | socat - UDP-DATAGRAM:255.255.255.255:$port,broadcast)
 		setIp $ip
