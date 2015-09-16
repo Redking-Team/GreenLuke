@@ -32,7 +32,7 @@ connect() {
 	remoteIp=$1
 	echo "trying to establish connection with $remoteIp" | tee -a $logfile
 	echo "testing for public key auth..." | tee -a $logfile
-	ssh -q -o BatchMode=yes overflow@10.10.0.143 true 2> /dev/null
+	ssh -q -o BatchMode=yes $username@$remoteIp true 2> /dev/null
 	if test $? != 0; then
 		echo "... no public key auth, stopping here" | tee -a $logfile
 		return
