@@ -7,14 +7,20 @@ maxSleep=$((60*60))	# in s
 directory=/home/overflow/sync
 username=overflow
 logfile=/home/overflow/.GreenLuke.log
+quietMode=0
 
 
 IpFile=/dev/shm/GreenLuke$$.ip
 SearchFile=/dev/shm/GreenLuke$$.search
 
 log() {
-	date "+%Y-%m-%d %H:%M:%S : " | tr -d '\n' | tee -a $logfile
-	tee -a $logfile
+	if test $quietMode != 0; then
+		hackedPipe=false
+	else
+		hackedPipe=cat
+	fi
+	date "+%Y-%m-%d %H:%M:%S : " | tr -d '\n' | tee -a $logfile | $hackedPipe
+	tee -a $logfile | $hackedPipe
 }
 
 setIp() {
