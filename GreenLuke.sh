@@ -1,5 +1,5 @@
 #!/bin/bash
-# dependencies: ssh, sshd, unison, awk, iproute2, socat, zenity
+# dependencies: ssh, sshd, unison, awk, iproute2, socat, zenity, wc
 
 port=1337
 minSleep=$((60*10))	# in s
@@ -97,9 +97,12 @@ while true; do
 	if test $(getSearch) != 0; then
 		echo "searching... " | log
 		ip=$(ip addr show eth0 | grep "inet " | awk '{print $2}' | awk -F'/' '{print $1}')
-		remoteHostname=$(echo $ip | socat - UDP-DATAGRAM:255.255.255.255:$port,broadcast)
+		remoteHostnames=$(echo $ip | socat - UDP-DATAGRAM:255.255.255.255:$port,broadcast)
 		setIp $ip
-		echo "found: $remoteHostname" | log
+		echo "found $(echo $remoteHostnames | wc -l) host(s): " | log
+		echo $remoteHostnames | while read name; do
+			echo "  - $name" | log
+		done
 	fi
 	sleep  $(($RANDOM % ($maxSleep - $minSleep) + $minSleep))
 done
