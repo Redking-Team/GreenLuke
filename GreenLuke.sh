@@ -99,7 +99,7 @@ while true; do
 		ip=$(ip addr show eth0 | grep "inet " | awk '{print $2}' | awk -F'/' '{print $1}')
 		remoteHostnames=$(echo $ip | socat - UDP-DATAGRAM:255.255.255.255:$port,broadcast)
 		setIp $ip
-		echo "found $(echo $remoteHostnames | wc -l) host(s): " | log
+		echo "found $(echo "$remoteHostnames" | wc -l) host(s): " | log
 		echo "$remoteHostnames" | while read name; do
 			echo "  - $name" | log
 		done
