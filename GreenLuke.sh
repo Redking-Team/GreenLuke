@@ -16,7 +16,7 @@ TokenFile=/dev/shm/GreenLuke$$.token
 IpFile=/dev/shm/GreenLuke$$.ip
 SearchFile=/dev/shm/GreenLuke$$.search
 
-echo $token > $TokenFile
+echo -n $token > $TokenFile
 
 log() {
 	if test $quietMode != 0; then
@@ -46,6 +46,7 @@ setSearch 1
 
 connect() {
 	remoteIp=$1
+	remoteTokenFile=$2
 	echo "trying to establish connection with $remoteIp" | log
 	echo "testing for public key auth..." | log
 	ssh -q -o BatchMode=yes $username@$remoteIp true 2> /dev/null
@@ -53,7 +54,14 @@ connect() {
 		echo "... no public key auth, stopping here" | log
 		return
 	fi
-	echo "testing server..." | log
+	echo "testing for token..." | log
+	remoteToken=$(ssh -o BatchMode=yes $username@$remoteIp "cat $remoteTokenFile" 2> /dev/null)
+	if test "$remoteToken" != "$token"; then
+		echo "... not the same token, stopping here" | log
+		return
+	fi
+
+	echo "testing for unison..." | log
 	unison $directory ssh://$username@$remoteIp/$directory -ui text -testserver 2>&1 | log
 	if test $? != 0; then
 		echo "... unison error. : (" | log
@@ -81,15 +89,21 @@ connect() {
 listen() {
 	while true; do		
 		echo "listening..." | log
-		remoteIp=$(hostname | socat -T 3 UDP-LISTEN:$port -) 
+		response=$(hostname | socat -T 3 UDP-LISTEN:$port -)
+		oldIFS="$IFS"
+		response=( $response )
+		IFS="$oldIFS"
+		remoteIp=${response[0]}
+		$remoteTokenFile=${response[1]}
 		sleep 1s 	# otherwise our logfiles get messed up
 		echo "incomming request" | log
 		if test "$remoteIp" == "$(getIp)"; then
 			echo "oh, that's me. ignoring ourself" | log
 		else
 			setSearch 0
-			connect $remoteIp
+			connect $remoteIp $remoteTokenFile
 			setSearch 1
+			sleep 2s # to prevent token brute forcing
 		fi
 	done
 }
@@ -103,8 +117,8 @@ while true; do
 	if test $(getSearch) != 0; then
 		echo "searching... " | log
 		ip=$(ip addr show eth0 | grep "inet " | awk '{print $2}' | awk -F'/' '{print $1}')
-		remoteHostnames=$(echo $ip | socat - UDP-DATAGRAM:255.255.255.255:$port,broadcast)
 		setIp $ip
+		remoteHostnames=$(echo -e "$ip\n$TokenFile" | socat - UDP-DATAGRAM:255.255.255.255:$port,broadcast)
 		echo "found $(echo "$remoteHostnames" | wc -l) host(s): " | log
 		echo "$remoteHostnames" | while read name; do
 			echo "  - $name" | log
