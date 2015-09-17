@@ -11,10 +11,12 @@ maxSleep=$((60*60))
 directory=/home/overflow/sync
 # username for ssh
 username=overflow
+#network interface for broadcasting
+interface=eth1
 logfile=/home/overflow/.GreenLuke.log
 # display log messages not in terminal
 quietMode=0
-# generate more log; not yet implemented
+# generate more log, set to 2 for even more logs
 verboseMode=1 
 # don't start listen-thread
 noListeningMode=0
@@ -26,10 +28,9 @@ TokenFile=/dev/shm/GreenLuke$$.token
 IpFile=/dev/shm/GreenLuke$$.ip
 SearchFile=/dev/shm/GreenLuke$$.search
 
-# here starts the program
 
-# so others can read the token
-echo -n $token > $TokenFile
+
+# some functions
 
 # function for logging; get's text via stdin
 log() {
@@ -58,8 +59,12 @@ getSearch() {
 	cat $SearchFile
 }
 
-setIp 127.0.0.1
-setSearch 1
+# guess what this does
+# $1 is verbose mode to check
+verbose() {
+	param=$(($1 + 0))
+	return $((($param - $verboseMode) <= 0))
+}
 
 # this function does the following:
 #  - are we public key authenicated on remote host $1? if not: return
@@ -72,45 +77,52 @@ setSearch 1
 #      -> display warning and return
 #    - else display error and exit (the error is probably somthing serious)
 connect() {
+	verbose 2 || (echo "listen-thread: (vv) intering connect-routine" | log)
 	remoteIp=$1
 	remoteTokenFile=$2
-	echo "trying to establish connection with $remoteIp" | log
-	echo "testing for public key auth..." | log
-	ssh -q -o BatchMode=yes $username@$remoteIp true 2> /dev/null
+	verbose 0 || (echo "listen-thread: trying to establish connection with $remoteIp" | log)
+	verbose 0 || (echo "listen-thread: testing for public key auth..." | log)
+	error=$(ssh -q -o BatchMode=yes $username@$remoteIp true 2>1)
 	if test $? != 0; then
-		echo "... no public key auth, stopping here" | log
+		verbose 1 || (echo -e "listen-thread: (v) ssh exited with $?.\n$error" | log)
+		verbose 0 || (echo "listen-thread: ... no public key auth, stopping here" | log)
 		return
 	fi
-	echo "testing for token... ($remoteTokenFile)" | log
-	remoteToken=$(ssh -o BatchMode=yes $username@$remoteIp "cat $remoteTokenFile" 2> /dev/null)
+	verbose 2 || (echo "listen-thread: (vv) requesting remote token file" | log)
+	remoteToken=$(ssh -o BatchMode=yes $username@$remoteIp "cat $remoteTokenFile" 2> /dev/null)	
+	verbose 0 || (echo "listen-thread: comparing tokens..." | log)
 	if test "$remoteToken" != "$token"; then
-		echo "... not the same token ($remoteToken), stopping here" | log
+		verbose 1 || (echo "listen-thread: (v) remote token is $remoteToken" | log)
+		verbose 0 || (echo "listen-thread: ... tokens are not the same, stopping here" | log)
 		return
 	fi
-
-	echo "testing for unison..." | log
-	unison $directory ssh://$username@$remoteIp/$directory -ui text -testserver 2>&1 | log
+	verbose 0 || (echo "listen-thread: testing for unison..." | log)
+	error=$(unison $directory ssh://$username@$remoteIp/$directory -ui text -testserver 2>&1)
 	if test $? != 0; then
-		echo "... unison error. : (" | log
+		verbose 1 || (echo -e "listen-thread: (v) unison exited with $?,\n$error" | log)
+		verbose 0 || (echo "listen-thread: ... unison error, stopping here" | log)
 		return
 	fi
-	echo "let's get this party started" | log
+	verbose 0 || (echo "listen-thread: starting sync..." | log)
 	message=$(echo | unison $directory ssh://$username@$remoteIp/$directory -auto -owner -terse -batch 2>&1) 
 	unisonError=$?
-	echo $message | log
+	verbose 1 || (echo "listen-thread: (v) unison says:\n$message" | log)
 	if test $unisonError != 0; then
-		echo "unison return some error" | log
-		echo "informing user" | log
-		if test $unisonError == 1; then
+		verbose 0 || (echo "listen-thread: unison return some error" | log)
+		verbose 1 || (echo "listen-thread: (v) unison exited with $?" | log)
+		verbose 0 || (echo "listen-thread: informing user" | log)
+		if test $unisonError == 1; then	
+			verbose 1 || (echo "listen-thread: (v) errorcode is 1, probably some conflics in unison; display warning" | log)
 			zenity --warning --text="$(echo $message | tr -d '<' | tr -d '>' |)" --title=="GreenLuke"
-		else
+		else	
+			verbose 1 || (echo "listen-thread: (v) unknown errorcode; display error" | log)
 			zenity --error --text="There was a critical error while synchronizing.\nGreenLuke will exit now.\nPlease check out $log" --title="GreenLuke"
-			echo "exiting" | log
+			verbose 0 || (echo "listen-thread: exiting. bye." | log)
 			exit
 		fi
 	fi
-	echo "successfully synchronized." | log
-	echo "restarting daemon." | log
+	verbose 0 || (echo "listen-thread: successfully synchronized." | log)
+	verbose 2 || (echo "listen-thread: (vv) returning to main loop" | log)
 }
 
 # this is the listen-thread
@@ -122,29 +134,46 @@ connect() {
 #   -> function connect
 #   - enable search thread
 listen() {
+	verbose 2 || (echo "(vv) starting listen-thread main loop" | log)
 	while true; do		
-		echo "listening..." | log
-		response=$(hostname | socat -T 3 UDP-LISTEN:$port -)
+		verbose 0 || (echo "listen-thread: listening..." | log)
+		verbose 2 || (echo "listen-thread: ... on udp port $port" | log)
+		request=$(hostname | socat -T 3 UDP-LISTEN:$port -)
+		sleep 1s	# otherwise our logfiles get messed up	
+		verbose 0 || (echo "listen-thread: incomming request" | log)
+		verbose 2 || (echo "listen-thread: (vv) reformat request data" | log)
 		oldIFS="$IFS"
-		response=( $response )
+		request=( $request )
 		IFS="$oldIFS"
-		remoteIp=${response[0]}
-		remoteTokenFile=${response[1]}
-		sleep 1s 	# otherwise our logfiles get messed up
-		echo "incomming request" | log
+		remoteIp=${request[0]}
+		remoteTokenFile=${request[1]}
+		verbose 1 || (echo "listen-thread: (v) response from $remoteIp ($remoteTokenFile)" | log)
+		verbose 2 || (echo "listen-thread: (vv) testing if this is our own ip" | log)
 		if test "$remoteIp" == "$(getIp)"; then
-			echo "oh, that's me. ignoring ourself" | log
-		else
+			verbose 0 || (echo "listen-thread: oh, that's me. ignoring ourself" | log)
+		else	
+			verbose 1 || (echo "listen-thread: (v) pausing search-thread" | log)
 			setSearch 0
-			connect $remoteIp $remoteTokenFile
+			connect $remoteIp $remoteTokenFile	
+			verbose 1 || (echo "listen-thread: (v) starting search-thread" | log)
 			setSearch 1
 			sleep 2s # to prevent token brute forcing
 		fi
 	done
 }
 
+verbose 0 || (echo "Welcome to GreenLuke" | log)
+verbose 2 || (echo "(vv) init vars" | log)
+setIp 127.0.0.1
+setSearch 1
+
+# so others can read the token
+verbose 2 || (echo "(vv) writing token file $TokenFile" | log)
+echo -n $token > $TokenFile
+
 # if not in noListingMode: start listen-thread
 if test $noListeningMode = 0; then
+	verbose 1 || (echo "(v) starting listen-thread..." | log)
 	listen $port &
 	sleep 3s
 fi
@@ -153,16 +182,25 @@ fi
 # - broadcast ip address and token filename
 # - display all hostnames
 # - sleep a random time (see settings)
+verbose 2 || (echo "(vv) starting search-thread main loop" | log)
 while true; do
 	if test $(getSearch) != 0; then
-		echo "searching... " | log
-		ip=$(ip addr show eth0 | grep "inet " | awk '{print $2}' | awk -F'/' '{print $1}')
+		verbose 2 || (echo "search-thread: (vv) we are enabled" | log)
+		verbose 2 || (echo "search-thread: (vv) getting ip address of interface $interface" | log)
+		ip=$(ip addr show $interface | grep "inet " | awk '{print $2}' | awk -F'/' '{print $1}')
+		verbose 1 || (echo "search-thread: (v) our ip address is: $ip" | log)
+		verbose 2 || (echo "search-thread: (vv) setting global ip var" | log)
 		setIp $ip
+		verbose 0 || (echo "search-thread: searching... " | log)
+		verbose 2 || (echo "search-thread: (vv) sending upd broadcast on port $port" | log)
 		remoteHostnames=$(echo -e "$ip\n$TokenFile" | socat - UDP-DATAGRAM:255.255.255.255:$port,broadcast)
-		echo "found $(echo "$remoteHostnames" | wc -l) host(s): " | log
+		verbose 0 || (echo "search-thread: found $(echo "$remoteHostnames" | wc -l) host(s): " | log)
 		echo "$remoteHostnames" | while read name; do
-			echo "  - $name" | log
+			verbose 0 || (echo "search-thread:   - $name" | log)
 		done
 	fi
-	sleep  $(($RANDOM % ($maxSleep - $minSleep) + $minSleep))
+	time=$(($RANDOM % ($maxSleep - $minSleep) + $minSleep))
+	verbose 1 || (echo "search-thread: (v) sleeping for $time s..." | log)
+	sleep  $time
 done
+
