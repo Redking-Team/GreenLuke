@@ -1,5 +1,5 @@
 # GreenLuke
-Synchronize multiple PCs in your local network.
+Automatically synchronize multiple PCs in your local network.
 
 Well, I'm not questioning that this is complete garbage, but hey: It works.
 
