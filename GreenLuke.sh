@@ -1,24 +1,40 @@
 #!/bin/bash
 # dependencies: ssh, sshd, unison, awk, iproute2, socat, zenity, wc
 
+# settings for user
+
 port=1337
-minSleep=$((60*10))	# in s
-maxSleep=$((60*60))	# in s
+# for search-thread; in s
+minSleep=$((60*10))
+maxSleep=$((60*60))
+# directory to sync
 directory=/home/overflow/sync
+# username for ssh
 username=overflow
 logfile=/home/overflow/.GreenLuke.log
+# display log messages not in terminal
 quietMode=0
-noServerMode=0
-
+# generate more log; not yet implemented
+verboseMode=1 
+# don't start listen-thread
+noListeningMode=0
+# token for security reasons; has to be the same on all PCs
 token="something" # maybe from pwgen pwgen 100
 
+# some internal files
 TokenFile=/dev/shm/GreenLuke$$.token
 IpFile=/dev/shm/GreenLuke$$.ip
 SearchFile=/dev/shm/GreenLuke$$.search
 
+# here starts the program
+
+# so others can read the token
 echo -n $token > $TokenFile
 
+# function for logging; get's text via stdin
 log() {
+	# dirty hack because I didn't knew how to make this better.
+	# just ignore the following
 	if test $quietMode != 0; then
 		hackedPipe=false
 	else
@@ -28,6 +44,7 @@ log() {
 	tee -a $logfile | $hackedPipe
 }
 
+# to get and set "variables" acroos threads I wrote this nice functions
 setIp() {
 	echo -n $1 > $IpFile
 }
@@ -44,6 +61,16 @@ getSearch() {
 setIp 127.0.0.1
 setSearch 1
 
+# this function does the following:
+#  - are we public key authenicated on remote host $1? if not: return
+#      (this also checks for running ssh server; captain obvious is obvious)
+#  - are the tokens the same on remote (content in file $2) and local host? if not: return
+#  - is there unison available on remote host? if not: return
+#  -> start unison
+#  - if there any error?
+#    - are there conflicts (return code 1)? 
+#      -> display warning and return
+#    - else display error and exit (the error is probably somthing serious)
 connect() {
 	remoteIp=$1
 	remoteTokenFile=$2
@@ -86,6 +113,14 @@ connect() {
 	echo "restarting daemon." | log
 }
 
+# this is the listen-thread
+# if there is any data (while receiving send hostname):
+#   - save it to array
+#       (first element is the remote address, second element is the token filename)
+# if remote address is not our own address:
+#   - disable search-thread
+#   -> function connect
+#   - enable search thread
 listen() {
 	while true; do		
 		echo "listening..." | log
@@ -108,11 +143,16 @@ listen() {
 	done
 }
 
-if test $noServerMode = 0; then
+# if not in noListingMode: start listen-thread
+if test $noListeningMode = 0; then
 	listen $port &
 	sleep 3s
 fi
 
+# this is the search-thread
+# - broadcast ip address and token filename
+# - display all hostnames
+# - sleep a random time (see settings)
 while true; do
 	if test $(getSearch) != 0; then
 		echo "searching... " | log
