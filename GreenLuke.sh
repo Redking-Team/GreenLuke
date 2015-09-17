@@ -8,10 +8,15 @@ directory=/home/overflow/sync
 username=overflow
 logfile=/home/overflow/.GreenLuke.log
 quietMode=0
+noServerMode=0
 
+token="something" # maybe from pwgen pwgen 100
 
+TokenFile=/dev/shm/GreenLuke$$.token
 IpFile=/dev/shm/GreenLuke$$.ip
 SearchFile=/dev/shm/GreenLuke$$.search
+
+echo $token > $TokenFile
 
 log() {
 	if test $quietMode != 0; then
@@ -89,9 +94,10 @@ listen() {
 	done
 }
 
-listen $port &
-
-sleep 3s
+if test $noServerMode = 0; then
+	listen $port &
+	sleep 3s
+fi
 
 while true; do
 	if test $(getSearch) != 0; then
