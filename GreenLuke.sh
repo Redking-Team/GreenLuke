@@ -54,10 +54,10 @@ connect() {
 		echo "... no public key auth, stopping here" | log
 		return
 	fi
-	echo "testing for token..." | log
+	echo "testing for token... ($remoteTokenFile)" | log
 	remoteToken=$(ssh -o BatchMode=yes $username@$remoteIp "cat $remoteTokenFile" 2> /dev/null)
 	if test "$remoteToken" != "$token"; then
-		echo "... not the same token, stopping here" | log
+		echo "... not the same token ($remoteToken), stopping here" | log
 		return
 	fi
 
@@ -94,7 +94,7 @@ listen() {
 		response=( $response )
 		IFS="$oldIFS"
 		remoteIp=${response[0]}
-		$remoteTokenFile=${response[1]}
+		remoteTokenFile=${response[1]}
 		sleep 1s 	# otherwise our logfiles get messed up
 		echo "incomming request" | log
 		if test "$remoteIp" == "$(getIp)"; then
