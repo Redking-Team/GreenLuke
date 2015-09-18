@@ -147,7 +147,7 @@ listen() {
 		IFS="$oldIFS"
 		remoteIp=${request[0]}
 		remoteTokenFile=${request[1]}
-		verbose 1 || (echo "listen-thread: (v) response from $remoteIp ($remoteTokenFile)" | log)
+		verbose 1 || (echo "listen-thread: (v) request from $remoteIp ($remoteTokenFile)" | log)
 		verbose 2 || (echo "listen-thread: (vv) testing if this is our own ip" | log)
 		if test "$remoteIp" == "$(getIp)"; then
 			verbose 0 || (echo "listen-thread: oh, that's me. ignoring ourself" | log)
