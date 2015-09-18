@@ -12,7 +12,7 @@ directory=/home/overflow/sync
 # username for ssh
 username=overflow
 #network interface for broadcasting
-interface=eth1
+interface=eth0
 logfile=/home/overflow/.GreenLuke.log
 # display log messages not in terminal
 quietMode=0
@@ -106,7 +106,7 @@ connect() {
 	verbose 0 || (echo "listen-thread: starting sync..." | log)
 	message=$(echo | unison $directory ssh://$username@$remoteIp/$directory -auto -owner -terse -batch 2>&1) 
 	unisonError=$?
-	verbose 1 || (echo "listen-thread: (v) unison says:\n$message" | log)
+	verbose 1 || (echo -e "listen-thread: (v) unison says:\n$message" | log)
 	if test $unisonError != 0; then
 		verbose 0 || (echo "listen-thread: unison return some error" | log)
 		verbose 1 || (echo "listen-thread: (v) unison exited with $?" | log)
