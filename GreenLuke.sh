@@ -22,8 +22,11 @@ verboseMode=1
 noListeningMode=0
 # token for security reasons; has to be the same on all PCs
 token="something" # maybe from pwgen pwgen 100
+# s to sleep for polling trigger file
+timePolling=10
 
 # some internal files
+TriggerFile=/dev/shm/GreenLuke$$.trigger
 TokenFile=/dev/shm/GreenLuke$$.token
 IpFile=/dev/shm/GreenLuke$$.ip
 SearchFile=/dev/shm/GreenLuke$$.search
@@ -57,6 +60,12 @@ setSearch() {
 }
 getSearch() {
 	cat $SearchFile
+}
+setTrigger() {
+	echo -n $1 > $TriggerFile
+}
+getTrigger() {
+	cat $TriggerFile
 }
 
 # guess what this does
@@ -166,6 +175,7 @@ verbose 0 || (echo "Welcome to GreenLuke" | log)
 verbose 2 || (echo "(vv) init vars" | log)
 setIp 127.0.0.1
 setSearch 1
+setTrigger 0
 
 # so others can read the token
 verbose 2 || (echo "(vv) writing token file $TokenFile" | log)
@@ -182,6 +192,7 @@ fi
 # - broadcast ip address and token filename
 # - display all hostnames
 # - sleep a random time (see settings)
+#   - if triggered continue immediatly (after max $timePolling)
 verbose 2 || (echo "(vv) starting search-thread main loop" | log)
 while true; do
 	if test $(getSearch) != 0; then
@@ -205,6 +216,14 @@ while true; do
 	fi
 	time=$(($RANDOM % ($maxSleep - $minSleep) + $minSleep))
 	verbose 1 || (echo "search-thread: (v) sleeping for $time s..." | log)
-	sleep  $time
+	napping=0
+	while test $time -gt $napping; do
+		sleep $timePolling
+		napping=$(($napping + $timePolling))
+		if test $(getTrigger); then
+			verbose 1 || (echo "search-thread: (v) we got triggered after $napping" | log)
+			napping=$time
+		fi
+	done
 done
 
