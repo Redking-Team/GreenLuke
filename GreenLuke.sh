@@ -220,7 +220,7 @@ while true; do
 	while test $time -gt $napping; do
 		sleep $timePolling
 		napping=$(($napping + $timePolling))
-		if test $(getTrigger); then
+		if test "$(getTrigger)" = "1"; then
 			verbose 1 || (echo "search-thread: (v) we got triggered after $napping" | log)
 			napping=$time
 		fi
