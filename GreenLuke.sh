@@ -17,7 +17,7 @@ logfile=/home/overflow/.GreenLuke.log
 # display log messages not in terminal
 quietMode=0
 # generate more log, set to 2 for even more logs
-verboseMode=1 
+verboseMode=1
 # don't start listen-thread
 noListeningMode=0
 # token for security reasons; has to be the same on all PCs
@@ -198,19 +198,24 @@ while true; do
 		verbose 2 || (echo "search-thread: (vv) we are enabled" | log)
 		verbose 2 || (echo "search-thread: (vv) getting ip address of interface $interface" | log)
 		ip=$(ip addr show $interface | grep "inet " | awk '{print $2}' | awk -F'/' '{print $1}')
-		verbose 1 || (echo "search-thread: (v) our ip address is: $ip" | log)
-		verbose 2 || (echo "search-thread: (vv) setting global ip var" | log)
-		setIp $ip
-		verbose 0 || (echo "search-thread: searching... " | log)
-		verbose 2 || (echo "search-thread: (vv) sending upd broadcast on port $port" | log)
-		remoteHostnames=$(echo -e "$ip\n$TokenFile" | socat - UDP-DATAGRAM:255.255.255.255:$port,broadcast)
-		if test "$remoteHostnames" = ""; then
-			verbose 0 || (echo "search-thread: no hosts found" | log)
+		if test "$ip" = ""; then			
+			verbose 1 || (echo "search-thread: (v) interface $interface has no address, maybe not up, skipping broadcast" | log)
+			verbose 0 || (echo "search-thread: not connected to any network" | log)
 		else
-			verbose 0 || (echo "search-thread: found $(echo "$remoteHostnames" | wc -l) host(s): " | log)
-			echo "$remoteHostnames" | while read name; do
-				verbose 0 || (echo "search-thread:   - $name" | log)
-			done
+			verbose 1 || (echo "search-thread: (v) our ip address is: $ip" | log)
+			verbose 2 || (echo "search-thread: (vv) setting global ip var" | log)
+			setIp $ip
+			verbose 0 || (echo "search-thread: searching... " | log)
+			verbose 2 || (echo "search-thread: (vv) sending upd broadcast on port $port" | log)
+			remoteHostnames=$(echo -e "$ip\n$TokenFile" | socat - UDP-DATAGRAM:255.255.255.255:$port,broadcast)
+			if test "$remoteHostnames" = ""; then
+				verbose 0 || (echo "search-thread: no hosts found" | log)
+			else
+				verbose 0 || (echo "search-thread: found $(echo "$remoteHostnames" | wc -l) host(s): " | log)
+				echo "$remoteHostnames" | while read name; do
+					verbose 0 || (echo "search-thread:   - $name" | log)
+				done
+			fi
 		fi
 	fi
 	time=$(($RANDOM % ($maxSleep - $minSleep) + $minSleep))
@@ -222,6 +227,7 @@ while true; do
 		if test "$(getTrigger)" = "1"; then
 			verbose 1 || (echo "search-thread: (v) we got triggered after $napping" | log)
 			napping=$time
+			setTrigger 0
 		fi
 	done
 done
